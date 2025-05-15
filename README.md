@@ -11,7 +11,7 @@ gcc -o ac-trainer ac-trainer.c mem.h mem.c
 ## usage
 
 ```sh
-sudo ./ac-trainer <pid>
+sudo ./ac-trainer
 ```
 
 ## notes
