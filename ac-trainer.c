@@ -4,41 +4,53 @@
 #include <stdint.h>
 #include "mem.h"
 
-#define LIB_BASE      0x78e34a2ab000UL
-#define RELATIVE_BASE 0x32A8
-#define OFFSET1       0x78
-#define OFFSET2       0x30
-#define OFFSET3       0x154
-#define DESIRED_VALUE 1000
+#define MODULE_NAME "libX11.so"
+#define PROCESS_NAME "linux_64_client"
+#define AMMO_VALUE 1000
 
-int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    printf("usage: sudo ./ac-trainer <pid>\n");
+uintptr_t base_offset = 0x32A8;
+uintptr_t offsets[] = { 0x78, 0x30, 0x154 };
+size_t offsets_len = sizeof(offsets) / sizeof(offsets[0]);
+
+int main() {
+  pid_t pid = find_pid_by_name(PROCESS_NAME);
+  if (pid == -1) {
+    fprintf(stderr, "Could not find process: %s\n", PROCESS_NAME);
     return 1;
   }
 
-  pid_t pid = atoi(argv[1]);
-  if (open_mem(pid) != 0) return 1;
+  uintptr_t base = get_nth_module_base(pid, MODULE_NAME, 4);
+  if (!base) {
+    fprintf(stderr, "Could not find module base: %s\n", MODULE_NAME);
+    return 1;
+  }
+  printf("Module base: 0x%lx\n", base);
 
-  printf("Trainer started. Using base: 0x%lx\n", LIB_BASE);
+  uintptr_t addr = base + base_offset;
+  uintptr_t ptr = 0;
+  printf("base + offset: 0x%lx\n", addr);
 
-  while (1) {
-    unsigned long ptr1 = read_ptr(LIB_BASE + RELATIVE_BASE);
-    if (!ptr1) break;
+  if (mem_read(pid, addr, &ptr, sizeof(ptr)) != 0) {
+    fprintf(stderr, "Failed to read base pointer\n");
+    return 1;
+  }
+  printf("Pointer read value: 0x%lx\n", ptr);
 
-    unsigned long ptr2 = read_ptr(ptr1 + OFFSET1);
-    if (!ptr2) break;
-
-    unsigned long ptr3 = read_ptr(ptr2 + OFFSET2);
-    if (!ptr3) break;
-
-    unsigned long final_addr = ptr3 + OFFSET3;
-
-    write_int(final_addr, DESIRED_VALUE);
-
-    usleep(50000);
+  for (size_t i = 0; i < offsets_len - 1; ++i) {
+    if (mem_read(pid, ptr + offsets[i], &ptr, sizeof(ptr)) != 0) {
+      fprintf(stderr, "Failed to follow pointer chain at level %zu\n", i);
+      return 1;
+    }
   }
 
-  close_mem();
+  uintptr_t final_addr = ptr + offsets[offsets_len - 1];
+  printf("Freezing ammo at 0x%lx\n", final_addr);
+
+  int ammo = AMMO_VALUE;
+  while (1) {
+    mem_write(pid, final_addr, &ammo, sizeof(ammo));
+    usleep(30000);
+  }
+
   return 0;
 }

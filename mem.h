@@ -1,9 +1,13 @@
-#pragma once
+#ifndef MEM_H
+#define MEM_H
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <stddef.h>
 
-int open_mem(pid_t pid);
-void close_mem();
-unsigned long read_ptr(unsigned long addr);
-int write_int(unsigned long addr, int value);
+int mem_read(pid_t pid, uintptr_t address, void *buffer, size_t size);
+int mem_write(pid_t pid, uintptr_t address, void *buffer, size_t size);
+pid_t find_pid_by_name(const char *name);
+uintptr_t get_nth_module_base(pid_t pid, const char *mod_name, int index);
+
+#endif
